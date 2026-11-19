@@ -28,6 +28,7 @@ function selectedPanel() {
   return state.panels[state.selected];
 }
 
+// Highlight the active button in one control row.
 function markActive(rowId, attr, value) {
   const row = document.getElementById(rowId);
   if (!row) return;
@@ -67,8 +68,8 @@ function buildButton(rowId, label, dataset, title) {
 }
 
 function buildControls() {
-  for (const [id, label] of Object.entries(SIZES)) {
-    const btn = buildButton('sizeRow', label.label, { size: id });
+  for (const [id, size] of Object.entries(SIZES)) {
+    const btn = buildButton('sizeRow', size.label, { size: id });
     btn.addEventListener('click', () => { state.size = id; render(); });
   }
   for (const grade of GRADES) {

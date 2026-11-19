@@ -43,8 +43,8 @@ export async function applyShot(state, shot) {
     state.size = 'portrait';
     state.panels[0].kind = 'scene'; state.panels[0].scene = 'neon';
     state.panels[1].kind = 'scene'; state.panels[1].scene = 'sunset';
-    // Lighthouse for the bottom band: its tower spans the full panel height,
-    // so it stays visible above the title band.
+    // Lighthouse for the bottom band: its tower spans the full panel
+    // height, so it stays visible above the title band.
     state.panels[2].kind = 'scene'; state.panels[2].scene = 'lighthouse';
     state.grade = 'neon';
   } else if (name === 'square') {

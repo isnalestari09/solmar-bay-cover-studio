@@ -40,7 +40,7 @@ Or open `app/index.html` from any static file server. The app works fully offlin
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-`main.ts` copies `app/` and `screenshots/` to the output directory and writes `dossier.json` with the kit's `buildDossier`.
+`main.ts` copies `app/` and `screenshots/` to the output directory and writes `dossier.json` with the kit's `buildDossier`. It never removes the output directory itself, so it runs cleanly where the output path is a bind mount.
 
 ## Entry
 

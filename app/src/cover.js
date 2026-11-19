@@ -1,6 +1,7 @@
 // cover.js — the cover layout: sizes, diagonal panels, photo fit, title band.
-// The cover is one canvas. Three panels are split by two slanted dividers:
-// vertical slants for landscape and square, horizontal slants for portrait.
+// One canvas holds the whole cover. Three panels are split by two slanted
+// dividers: vertical slants for landscape and square, horizontal slants
+// for portrait. A slanted title band across the bottom carries the caption.
 
 import { paintScene, applyGrade, gradeAccent } from './scenes.js';
 
@@ -62,8 +63,10 @@ export function panelPolygons(sizeId) {
 function polygonBounds(poly) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const [px, py] of poly) {
-    minX = Math.min(minX, px); minY = Math.min(minY, py);
-    maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
+    minX = Math.min(minX, px);
+    minY = Math.min(minY, py);
+    maxX = Math.max(maxX, px);
+    maxY = Math.max(maxY, py);
   }
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
@@ -98,10 +101,11 @@ export function drawPhotoPanel(ctx, img, rect, panel) {
   ctx.drawImage(img, x, y, dw, dh);
 }
 
+// The two dividers: a dark wide stroke with a thin accent line on top.
+// The endpoints are the midpoints of the shared polygon edges, so the
+// divider runs exactly down the middle of the slant.
 function drawDividers(ctx, sizeId, w, h, accent) {
   const polys = panelPolygons(sizeId);
-  // Divider endpoints: for vertical panels the shared edge runs top-to-bottom;
-  // for portrait's horizontal bands it runs left-to-right.
   const ends = (i) => {
     const a = polys[i];
     const b = polys[i + 1];
@@ -117,9 +121,9 @@ function drawDividers(ctx, sizeId, w, h, accent) {
     ];
   };
   ctx.save();
+  ctx.lineJoin = 'round';
   ctx.strokeStyle = 'rgba(8,6,16,0.9)';
   ctx.lineWidth = Math.max(6, Math.min(w, h) * 0.012);
-  ctx.lineJoin = 'round';
   for (let i = 0; i < polys.length - 1; i++) {
     const [p, q] = ends(i);
     ctx.beginPath();
@@ -139,7 +143,7 @@ function drawDividers(ctx, sizeId, w, h, accent) {
   ctx.restore();
 }
 
-// Slanted title band across the bottom, with title, subtitle and tagline.
+// Slanted title band across the bottom: title, subtitle, tagline.
 function drawTitleBand(ctx, state, w, h) {
   const accent = gradeAccent(state.grade);
   const bandH = h * 0.19;
