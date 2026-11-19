@@ -1,109 +1,120 @@
-:root {
-  --ink: #14102a;
-  --paper: #f6f1ff;
-  --accent: #ff5e78;
-  --sunset: #ff7e5f;
-  --panel: #ffffff;
-  --line: #e3dcf5;
-}
+/* Solmar Bay Cover Studio: dusk-purple editor shell around the cover canvas. */
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
-  background: linear-gradient(160deg, #2b1055 0%, #7597de 55%, #ff7e5f 100%);
-  color: var(--ink);
+  color: #f4f0ff;
+  background: linear-gradient(135deg, #241a5e 0%, #5b2a8a 55%, #b83a6e 100%);
   min-height: 100vh;
 }
-.topbar {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 18px 24px 8px;
-  color: #fff;
+.topbar { padding: 18px 28px 6px; }
+.topbar h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 4px;
+  font-weight: 900;
 }
-.brand .logo {
-  font-family: "Arial Black", Arial, sans-serif;
-  font-size: 28px;
-  letter-spacing: 2px;
-  text-shadow: 0 2px 0 rgba(0,0,0,.35);
-}
-.brand .sub {
-  font-size: 15px;
-  margin-left: 10px;
-  opacity: .9;
+.topbar h1 span {
+  font-size: 16px;
+  letter-spacing: 1px;
+  font-weight: 400;
   font-style: italic;
+  color: #ffd166;
 }
-.tag { margin: 0; opacity: .92; font-size: 14px; }
-.studio {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 20px;
-  padding: 12px 24px 28px;
-  align-items: start;
+.topbar p { margin: 4px 0 0; color: #d9cdf5; font-size: 14px; }
+.layout {
+  display: flex;
+  gap: 22px;
+  padding: 14px 28px 28px;
+  align-items: flex-start;
 }
-.preview-wrap { position: sticky; top: 12px; }
-#cover {
+.preview-pane { flex: 1 1 auto; min-width: 0; }
+#preview {
   width: 100%;
   height: auto;
   display: block;
   border-radius: 10px;
-  box-shadow: 0 18px 50px rgba(10, 4, 30, .55);
-  cursor: crosshair;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   background: #fff;
+  cursor: crosshair;
 }
-.hint { color: #fff; font-size: 13px; opacity: .95; margin: 10px 2px 0; }
+.hint { color: #d9cdf5; font-size: 13px; margin: 10px 2px 0; }
 .controls {
-  background: var(--panel);
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 10px 30px rgba(10, 4, 30, .35);
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.group { margin-bottom: 18px; }
-.group h2 { font-size: 14px; margin: 0 0 8px; letter-spacing: .4px; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; }
-.row.small { margin-top: 8px; }
-button, .upload {
-  font: inherit;
-  border: 1px solid var(--line);
-  background: var(--paper);
+.card {
+  background: #fff;
+  color: #241a3e;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.card h2 { margin: 0 0 10px; font-size: 15px; }
+.card h2 span { color: #b83a6e; }
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+button {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 12px;
   border-radius: 8px;
-  padding: 8px 10px;
+  border: 1px solid #c9bfe8;
+  background: #f1ecff;
+  color: #241a3e;
   cursor: pointer;
 }
-button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-.upload { display: block; text-align: center; background: var(--sunset); color: #fff; border: none; font-weight: bold; margin-top: 8px; }
-.upload input { display: none; }
-.ghost { background: transparent; margin-top: 8px; font-size: 13px; }
-.slider { display: block; margin-top: 10px; font-size: 13px; }
-.slider input { width: 100%; }
-label { display: block; font-size: 13px; margin-bottom: 8px; }
-label input[type="text"] {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 8px;
-  font: inherit;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+button:hover { background: #e2d8ff; }
+button:focus-visible {
+  outline: 3px solid #ffd166;
+  outline-offset: 2px;
 }
-.export {
-  width: 100%;
-  padding: 13px;
-  font-size: 17px;
-  font-weight: bold;
-  background: var(--accent);
+button.active {
+  background: #241a3e;
   color: #fff;
-  border: none;
+  border-color: #241a3e;
 }
-.status { font-size: 13px; color: #5a4a7a; margin: 10px 0 0; min-height: 18px; }
+button.primary {
+  width: 100%;
+  background: #ff7e3d;
+  border-color: #ff7e3d;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 11px 12px;
+  margin: 4px 0 8px;
+}
+button.primary:hover { background: #ff6a22; }
+button.export { font-size: 17px; padding: 13px 12px; margin: 0; }
+label { display: block; font-size: 13px; font-weight: 700; margin: 8px 0 4px; }
+input[type="text"] {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #c9bfe8;
+  border-radius: 8px;
+  color: #241a3e;
+}
+input[type="range"] { width: 100%; accent-color: #ff5a7a; }
+#photoTools { display: none; }
+#photoTools button { margin-top: 6px; }
+.note { color: #d9cdf5; font-size: 12px; margin: 0 2px; }
+/* Screenshot mode: the cover fills the whole window, no editor chrome. */
+body.shot-mode { background: #fff; }
+body.shot-mode .topbar,
+body.shot-mode .controls,
+body.shot-mode .hint { display: none; }
+body.shot-mode .layout { padding: 0; gap: 0; }
+body.shot-mode .preview-pane { flex: 1 1 100%; }
+body.shot-mode #preview {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: default;
+}
 @media (max-width: 900px) {
-  .studio { grid-template-columns: 1fr; }
-  .preview-wrap { position: static; }
+  .layout { flex-direction: column; }
+  .controls { flex-basis: auto; width: 100%; }
 }
-/* Shot mode: the page is just the cover, edge to edge, for screenshots. */
-body.shot { background: #fff; }
-body.shot .topbar, body.shot .controls, body.shot .hint { display: none; }
-body.shot .studio { display: block; padding: 0; }
-body.shot .preview-wrap { position: static; }
-body.shot #cover { border-radius: 0; box-shadow: none; width: 100vw; height: 100vh; object-fit: contain; }
