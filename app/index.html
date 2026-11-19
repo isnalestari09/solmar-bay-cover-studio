@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solmar Bay — Cover Studio</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">SOLMAR BAY</span><span class="sub">Cover Studio</span></div>
+  <p class="tag">Turn your photo into GTA-style poster art — Solmar Bay, Dani Reyes, one last drive.</p>
+</header>
+<main class="studio">
+  <section class="preview-wrap">
+    <canvas id="cover" width="1920" height="1080" aria-label="Cover preview"></canvas>
+    <p class="hint" id="hint">Click a panel to select it, then drag the photo inside it. Scroll or use the zoom slider to crop.</p>
+  </section>
+  <aside class="controls">
+    <div class="group">
+      <h2>1 · Size</h2>
+      <div class="row" id="sizes"></div>
+    </div>
+    <div class="group">
+      <h2>2 · Panel <span id="panelName">Hero</span></h2>
+      <div class="row" id="scenes"></div>
+      <label class="upload">Upload your photo
+        <input type="file" id="photo" accept="image/*">
+      </label>
+      <div class="row small">
+        <button class="sample" data-sample="samples/pier.jpg">Sample: Pier</button>
+        <button class="sample" data-sample="samples/boulevard.jpg">Sample: Boulevard</button>
+      </div>
+      <label class="slider">Zoom <input type="range" id="zoom" min="1" max="3" step="0.05" value="1"></label>
+      <button class="ghost" id="clearPhoto">Back to drawn scene</button>
+    </div>
+    <div class="group">
+      <h2>3 · Words</h2>
+      <label>Title <input type="text" id="title" value="SOLMAR BAY" maxlength="24"></label>
+      <label>Subtitle <input type="text" id="subtitle" value="DANI REYES" maxlength="24"></label>
+      <label>Tagline <input type="text" id="tagline" value="One last drive. One way home." maxlength="48"></label>
+    </div>
+    <div class="group">
+      <h2>4 · Colour grade</h2>
+      <div class="row" id="grades"></div>
+    </div>
+    <button class="export" id="export">Export PNG</button>
+    <p class="status" id="status">Ready — pick a size, fill the panels, export.</p>
+  </aside>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
