@@ -1,40 +1,32 @@
-// Solmar Bay Cover Studio entry program (Node 22, standard library only):
-// copies app/ and screenshots/ from this repository to the output directory
-// (MAKEFUN_OUTPUT_DIR, or /output) and writes /output/dossier.json with
-// buildDossier from vendor/makefun-app.ts. Both runs write the same bytes.
+// main.ts — hands the Solmar Bay Cover Studio app in.
+// Copies app/ and screenshots/ from this repository into the output
+// directory and writes /output/dossier.json with the kit's buildDossier.
+// Node 22, standard library only. Outside the grader, MAKEFUN_OUTPUT_DIR
+// stands in for /output.
 
-import { cp, mkdir, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-app.ts';
 
 const repoRoot = dirname(fileURLToPath(import.meta.url));
-const outDir = (process.env.MAKEFUN_OUTPUT_DIR || '').trim() || '/output';
+const outDir = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 
-const caps = {
+// Start from a clean output directory so stale files never leak in.
+rmSync(outDir, { recursive: true, force: true });
+mkdirSync(outDir, { recursive: true });
+
+cpSync(join(repoRoot, 'app'), join(outDir, 'app'), { recursive: true });
+cpSync(join(repoRoot, 'screenshots'), join(outDir, 'screenshots'), { recursive: true });
+
+const dossier = buildDossier(outDir, {
   text_max_bytes: 163840,
   screenshots: { max: 4, max_bytes: 262144 },
   app_max_files: 993,
   app_max_bytes: 50331648,
-};
-
-async function main() {
-  await mkdir(outDir, { recursive: true });
-  await cp(join(repoRoot, 'app'), join(outDir, 'app'), { recursive: true });
-  await cp(join(repoRoot, 'screenshots'), join(outDir, 'screenshots'), { recursive: true });
-  const dossier = buildDossier(outDir, caps);
-  await writeFile(join(outDir, 'dossier.json'), dossier);
-  const sha = createHash('sha256').update(dossier).digest('hex');
-  const limit = 1572864;
-  if (dossier.length > limit) {
-    throw new Error(`dossier.json is ${dossier.length} bytes, over the ${limit} allowed`);
-  }
-  console.log(`dossier.json: ${dossier.length} bytes, sha256 ${sha}`);
-  console.log(`output written to ${outDir}`);
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+  app_path_max_bytes: 1000,
 });
+
+writeFileSync(join(outDir, 'dossier.json'), dossier);
+console.log(`Solmar Bay Cover Studio handed in to ${outDir}`);
+console.log(`dossier.json written: ${dossier.length} bytes`);

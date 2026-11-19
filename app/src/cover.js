@@ -1,248 +1,227 @@
-// Solmar Bay cover renderer: lays out the multi-panel poster for a post size,
-// fills each panel with a drawn scene or a photo, grades it, and letters the
-// slanted title band. Everything is drawn on a 2D canvas; renderCover draws one
-// complete cover at any pixel size, so the editor preview and the PNG export
-// share the same drawing code.
+// cover.js — the cover layout: sizes, diagonal panels, photo fit, title band.
+// The cover is one canvas. Three panels are split by two slanted dividers:
+// vertical slants for landscape and square, horizontal slants for portrait.
 
-import { GRADES, SCENES } from './scenes.js';
+import { paintScene, applyGrade, gradeAccent } from './scenes.js';
 
-/** The three post sizes the app exports. */
 export const SIZES = {
-  square: { name: 'Square', w: 1080, h: 1080, label: 'Square · 1080 × 1080' },
-  portrait: { name: 'Portrait', w: 1080, h: 1350, label: 'Portrait · 1080 × 1350' },
-  wide: { name: 'Wide', w: 1920, h: 1080, label: 'Wide · 1920 × 1080' },
+  landscape: { w: 1920, h: 1080, label: 'Landscape 1920 × 1080' },
+  square: { w: 1080, h: 1080, label: 'Square 1080 × 1080' },
+  portrait: { w: 1080, h: 1350, label: 'Portrait 1080 × 1350' },
 };
 
-/** A panel's outline as a polygon of fractions of the cover (x, y in 0..1). */
-function heroWide() {
+export const DEFAULT_TITLE = 'SOLMAR BAY';
+export const DEFAULT_SUBTITLE = 'DANI REYES';
+export const DEFAULT_TAGLINE = 'One last drive. One last chance.';
+
+export function defaultPanels() {
   return [
-    [0, 0], [0.6, 0], [0.545, 0.82], [0, 0.82],
-  ];
-}
-function sideWideTop() {
-  return [
-    [0.615, 0], [1, 0], [1, 0.41], [0.56, 0.41],
-  ];
-}
-function sideWideBottom() {
-  return [
-    [0.56, 0.425], [1, 0.425], [1, 0.82], [0.545, 0.82],
-  ];
-}
-function heroSquare() {
-  return [
-    [0, 0], [1, 0], [1, 0.5], [0, 0.56],
-  ];
-}
-function lowerSquareLeft() {
-  return [
-    [0, 0.575], [0.5, 0.515], [0.5, 0.8], [0, 0.8],
-  ];
-}
-function lowerSquareRight() {
-  return [
-    [0.515, 0.515], [1, 0.515], [1, 0.8], [0.515, 0.8],
-  ];
-}
-function heroPortrait() {
-  return [
-    [0, 0], [1, 0], [1, 0.42], [0, 0.47],
-  ];
-}
-function midPortraitLeft() {
-  return [
-    [0, 0.485], [0.5, 0.44], [0.5, 0.7], [0, 0.7],
-  ];
-}
-function midPortraitRight() {
-  return [
-    [0.515, 0.44], [1, 0.44], [1, 0.7], [0.515, 0.7],
+    { kind: 'scene', scene: 'sunset', photo: null, zoom: 1, dx: 0, dy: 0 },
+    { kind: 'scene', scene: 'boat', photo: null, zoom: 1, dx: 0, dy: 0 },
+    { kind: 'scene', scene: 'lighthouse', photo: null, zoom: 1, dx: 0, dy: 0 },
   ];
 }
 
-/** Panel polygons per size: [hero, second, third], plus the title band's top. */
-export const LAYOUTS = {
-  wide: { panels: [heroWide(), sideWideTop(), sideWideBottom()], bandTop: 0.82 },
-  square: { panels: [heroSquare(), lowerSquareLeft(), lowerSquareRight()], bandTop: 0.8 },
-  portrait: { panels: [heroPortrait(), midPortraitLeft(), midPortraitRight()], bandTop: 0.7 },
-};
+export function defaultState() {
+  return {
+    size: 'landscape',
+    grade: 'sunset',
+    title: DEFAULT_TITLE,
+    subtitle: DEFAULT_SUBTITLE,
+    tagline: DEFAULT_TAGLINE,
+    panels: defaultPanels(),
+    selected: 0,
+  };
+}
 
-/** Point-in-polygon test on a fractional polygon, for picking a panel by click. */
-export function panelAt(sizeId, fx, fy) {
-  const polys = LAYOUTS[sizeId].panels;
+// Slant of the dividers, as a fraction of the short side.
+const SLANT = 0.045;
+
+// Panel polygons for a size: three clipped regions with slanted dividers.
+export function panelPolygons(sizeId) {
+  const { w, h } = SIZES[sizeId];
+  const s = Math.min(w, h) * SLANT;
+  if (sizeId === 'portrait') {
+    const y1 = h / 3;
+    const y2 = (h * 2) / 3;
+    return [
+      [[0, 0], [w, 0], [w, y1 - s], [0, y1 + s]],
+      [[0, y1 + s], [w, y1 - s], [w, y2 - s], [0, y2 + s]],
+      [[0, y2 + s], [w, y2 - s], [w, h], [0, h]],
+    ];
+  }
+  const x1 = w / 3;
+  const x2 = (w * 2) / 3;
+  return [
+    [[0, 0], [x1 + s, 0], [x1 - s, h], [0, h]],
+    [[x1 + s, 0], [x2 + s, 0], [x2 - s, h], [x1 - s, h]],
+    [[x2 + s, 0], [w, 0], [w, h], [x2 - s, h]],
+  ];
+}
+
+function polygonBounds(poly) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [px, py] of poly) {
+    minX = Math.min(minX, px); minY = Math.min(minY, py);
+    maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// Which panel a canvas point falls in, or -1.
+export function hitPanel(sizeId, px, py) {
+  const polys = panelPolygons(sizeId);
   for (let i = 0; i < polys.length; i++) {
-    const poly = polys[i];
-    let inside = false;
-    for (let a = 0, b = poly.length - 1; a < poly.length; b = a++) {
-      const [ax, ay] = poly[a];
-      const [bx, by] = poly[b];
-      if (ay > fy !== by > fy && fx < ((bx - ax) * (fy - ay)) / (by - ay) + ax) inside = !inside;
-    }
-    if (inside) return i;
+    if (pointInPolygon(px, py, polys[i])) return i;
   }
   return -1;
 }
 
-/** Draw an image cover-fitting a rectangle, with zoom and pan offsets in fractions. */
-function drawPhotoCover(ctx, img, x, y, w, h, fill) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
-  const zoom = fill.zoom || 1;
-  const scale = Math.max(w / iw, h / ih) * zoom;
-  const dw = iw * scale;
-  const dh = ih * scale;
-  const dx = x + (w - dw) / 2 + (fill.ox || 0) * w;
-  const dy = y + (h - dh) / 2 + (fill.oy || 0) * h;
-  ctx.drawImage(img, dx, dy, dw, dh);
+// Cover-fit a photo into a panel rect, with user zoom and pan.
+export function drawPhotoPanel(ctx, img, rect, panel) {
+  const zoom = Math.max(0.5, panel.zoom || 1);
+  const scale = Math.max(rect.w / img.naturalWidth, rect.h / img.naturalHeight) * zoom;
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  const x = rect.x + (rect.w - dw) / 2 + (panel.dx || 0);
+  const y = rect.y + (rect.h - dh) / 2 + (panel.dy || 0);
+  ctx.drawImage(img, x, y, dw, dh);
 }
 
-/** Fill one panel: a drawn scene, or a photo the user placed. */
-function fillPanel(ctx, poly, fill, pal, images) {
-  const xs = poly.map((p) => p[0]);
-  const ys = poly.map((p) => p[1]);
-  const x0 = Math.min(...xs);
-  const x1 = Math.max(...xs);
-  const y0 = Math.min(...ys);
-  const y1 = Math.max(...ys);
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(poly[0][0], poly[0][1]);
-  for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
-  ctx.closePath();
-  ctx.clip();
-  if (fill.type === 'photo') {
-    const img = images[fill.key];
-    if (img) {
-      drawPhotoCover(ctx, img, x0, y0, x1 - x0, y1 - y0, fill);
-    } else {
-      ctx.fillStyle = '#241a4a';
-      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+function drawDividers(ctx, sizeId, w, h, accent) {
+  const polys = panelPolygons(sizeId);
+  // Divider endpoints: for vertical panels the shared edge runs top-to-bottom;
+  // for portrait's horizontal bands it runs left-to-right.
+  const ends = (i) => {
+    const a = polys[i];
+    const b = polys[i + 1];
+    if (sizeId === 'portrait') {
+      return [
+        [(a[3][0] + b[0][0]) / 2, (a[3][1] + b[0][1]) / 2],
+        [(a[2][0] + b[1][0]) / 2, (a[2][1] + b[1][1]) / 2],
+      ];
     }
-  } else {
-    const scene = SCENES[fill.scene] || SCENES.dani;
-    scene.paint(ctx, x0, y0, x1 - x0, y1 - y0, pal);
-  }
-  ctx.restore();
-}
-
-/** A warm or neon wash over the whole art area, plus a vignette. */
-function gradeWash(ctx, w, h, bandTop, pal) {
-  const artH = h * bandTop;
-  const g = ctx.createLinearGradient(0, 0, 0, artH);
-  g.addColorStop(0, 'rgba(255,120,80,0)');
-  g.addColorStop(1, hexA(pal.accent, 0.12));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, artH);
-  ctx.fillStyle = hexA(pal.accent, 0.03);
-  ctx.fillRect(0, 0, w, artH);
-  const v = ctx.createRadialGradient(w / 2, artH / 2, Math.min(w, artH) * 0.35, w / 2, artH / 2, Math.max(w, artH) * 0.75);
-  v.addColorStop(0, 'rgba(0,0,0,0)');
-  v.addColorStop(1, 'rgba(10,5,30,0.38)');
-  ctx.fillStyle = v;
-  ctx.fillRect(0, 0, w, artH);
-}
-
-/** '#rrggbb' plus an alpha, as an rgba() string. */
-function hexA(hex, a) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-/** Fit a font size so the text fits maxW, starting from startPx. */
-function fitFont(ctx, text, startPx, maxW, weight, family) {
-  let px = startPx;
-  ctx.font = `${weight} ${px}px ${family}`;
-  while (px > 12 && ctx.measureText(text).width > maxW) {
-    px -= 2;
-    ctx.font = `${weight} ${px}px ${family}`;
-  }
-  return px;
-}
-
-/** The slanted white title band: stripe, big title, subtitle, tagline. */
-function titleBand(ctx, w, h, bandTop, state, pal) {
-  const y0 = h * bandTop;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, y0, w, h - y0);
+    return [
+      [(a[1][0] + b[0][0]) / 2, (a[1][1] + b[0][1]) / 2],
+      [(a[2][0] + b[3][0]) / 2, (a[2][1] + b[3][1]) / 2],
+    ];
+  };
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, y0, w, h - y0);
-  ctx.clip();
-  ctx.fillStyle = pal.accent;
-  ctx.save();
-  ctx.translate(0, y0 + (h - y0) * 0.32);
-  ctx.rotate(-0.045);
-  ctx.fillRect(-w * 0.05, -h * 0.028, w * 1.1, h * 0.056);
-  ctx.restore();
-  ctx.restore();
-  const cx = w / 2;
-  const title = (state.title || 'SOLMAR BAY').toUpperCase();
-  const sub = (state.subtitle || '').toUpperCase();
-  const tag = state.tagline || '';
-  const bandH = h - y0;
-  const titlePx = fitFont(ctx, title, bandH * 0.52, w * 0.92, 900, 'Arial Black, Arial, sans-serif');
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#160f33';
-  ctx.font = `900 ${titlePx}px 'Arial Black', Arial, sans-serif`;
-  ctx.fillText(title, cx, y0 + bandH * 0.42);
-  if (sub) {
-    ctx.fillStyle = pal.accent;
-    ctx.font = `800 ${Math.round(bandH * 0.13)}px Arial, sans-serif`;
-    ctx.fillText(sub, cx, y0 + bandH * 0.68);
-  }
-  if (tag) {
-    ctx.fillStyle = '#4a3a78';
-    ctx.font = `italic 600 ${Math.round(bandH * 0.115)}px Georgia, serif`;
-    ctx.fillText(tag, cx, y0 + bandH * 0.87);
-  }
-}
-
-/**
- * Draw one complete cover onto ctx at pixel size (w, h).
- * state: { size, grade, title, subtitle, tagline, panels: [fill, fill, fill] }
- * images: a map from photo keys ('sample:pier', 'sample:boulevard', 'upload:0'...)
- *   to loaded HTMLImageElements.
- */
-export function renderCover(ctx, w, h, state, images) {
-  const pal = GRADES[state.grade] || GRADES.sunset;
-  const layout = LAYOUTS[state.size] || LAYOUTS.wide;
-  ctx.save();
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, w, h);
-  const polys = layout.panels.map((poly) => poly.map(([fx, fy]) => [fx * w, fy * h]));
-  for (let i = 0; i < 3; i++) {
-    fillPanel(ctx, polys[i], state.panels[i], pal, images);
-  }
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = Math.max(2, w * 0.006);
-  for (const poly of polys) {
+  ctx.strokeStyle = 'rgba(8,6,16,0.9)';
+  ctx.lineWidth = Math.max(6, Math.min(w, h) * 0.012);
+  ctx.lineJoin = 'round';
+  for (let i = 0; i < polys.length - 1; i++) {
+    const [p, q] = ends(i);
     ctx.beginPath();
-    ctx.moveTo(poly[0][0], poly[0][1]);
-    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
-    ctx.closePath();
+    ctx.moveTo(p[0], p[1]);
+    ctx.lineTo(q[0], q[1]);
     ctx.stroke();
   }
-  gradeWash(ctx, w, h, layout.bandTop, pal);
-  titleBand(ctx, w, h, layout.bandTop, state, pal);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.004);
+  for (let i = 0; i < polys.length - 1; i++) {
+    const [p, q] = ends(i);
+    ctx.beginPath();
+    ctx.moveTo(p[0], p[1]);
+    ctx.lineTo(q[0], q[1]);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-/** A fresh default state: hero Dani, boat chase, lighthouse, Sunset grade. */
-export function defaultState() {
-  return {
-    size: 'wide',
-    grade: 'sunset',
-    title: 'SOLMAR BAY',
-    subtitle: 'DANI REYES',
-    tagline: 'One last drive. One way home.',
-    panels: [
-      { type: 'scene', scene: 'dani', zoom: 1, ox: 0, oy: 0 },
-      { type: 'scene', scene: 'boat', zoom: 1, ox: 0, oy: 0 },
-      { type: 'scene', scene: 'lighthouse', zoom: 1, ox: 0, oy: 0 },
-    ],
-  };
+// Slanted title band across the bottom, with title, subtitle and tagline.
+function drawTitleBand(ctx, state, w, h) {
+  const accent = gradeAccent(state.grade);
+  const bandH = h * 0.19;
+  const y0 = h - bandH;
+  const slant = w * 0.03;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, y0 + slant);
+  ctx.lineTo(w, y0 - slant);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(8,6,18,0.94)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, y0 + slant);
+  ctx.lineTo(w, y0 - slant);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = Math.max(3, h * 0.006);
+  ctx.stroke();
+  const pad = w * 0.045;
+  const maxTitleW = w - pad * 2;
+  let titleSize = Math.min(h * 0.085, w * 0.075);
+  const title = (state.title || DEFAULT_TITLE).toUpperCase();
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'alphabetic';
+  // Shrink the title until it fits the band.
+  for (let tries = 0; tries < 12; tries++) {
+    ctx.font = `900 ${titleSize}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
+    try { ctx.letterSpacing = `${Math.round(titleSize * 0.04)}px`; } catch (e) { /* older canvas */ }
+    if (ctx.measureText(title).width <= maxTitleW || titleSize < h * 0.03) break;
+    titleSize *= 0.92;
+  }
+  ctx.fillText(title, pad, y0 + bandH * 0.52);
+  try { ctx.letterSpacing = '0px'; } catch (e) { /* older canvas */ }
+  ctx.font = `700 ${Math.round(h * 0.032)}px "Helvetica Neue", Arial, sans-serif`;
+  ctx.fillStyle = accent;
+  const sub = (state.subtitle || '').toUpperCase();
+  const subW = ctx.measureText(sub).width;
+  ctx.fillText(sub, pad, y0 + bandH * 0.82);
+  ctx.font = `italic 400 ${Math.round(h * 0.026)}px Georgia, "Times New Roman", serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  const tag = state.tagline || '';
+  const tagW = ctx.measureText(tag).width;
+  // Tagline goes right only when it clears the subtitle; otherwise centre it.
+  if (pad + subW + w * 0.04 + tagW < w - pad) {
+    ctx.fillText(tag, w - pad - tagW, y0 + bandH * 0.82);
+  } else {
+    ctx.fillText(tag, (w - tagW) / 2, y0 + bandH * 0.98);
+  }
+  ctx.restore();
+}
+
+// Draw the whole cover into a canvas at its full size. Returns the canvas.
+export function drawCover(canvas, state) {
+  const { w, h } = SIZES[state.size];
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  const polys = panelPolygons(state.size);
+  for (let i = 0; i < 3; i++) {
+    const poly = polys[i];
+    const rect = polygonBounds(poly);
+    const panel = state.panels[i];
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]);
+    ctx.closePath();
+    ctx.clip();
+    if (panel && panel.kind === 'photo' && panel.photo) {
+      drawPhotoPanel(ctx, panel.photo, rect, panel);
+      ctx.fillStyle = 'rgba(20,10,30,0.12)';
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    } else {
+      paintScene(ctx, panel ? panel.scene : 'sunset', rect.x, rect.y, rect.w, rect.h);
+    }
+    ctx.restore();
+  }
+  drawDividers(ctx, state.size, w, h, gradeAccent(state.grade));
+  applyGrade(ctx, state.grade, w, h);
+  drawTitleBand(ctx, state, w, h);
+  return canvas;
 }

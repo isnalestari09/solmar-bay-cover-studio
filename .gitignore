@@ -1,3 +1,8 @@
+# Kit and build output — never committed.
 gta6-cover-art-01-kit/
 kit.tar.gz
 out/
+
+# Local machine files.
+node_modules/
+.DS_Store

@@ -1,357 +1,430 @@
-// Solmar Bay scene painters: four original procedural scenes drawn with canvas
-// primitives only. No image is loaded here; every skyline, palm, boat and figure is
-// drawn in code. Each painter fills the rectangle (x, y, w, h) and takes a palette
-// so the same scene can be re-graded in Sunset, Neon Nights or Vice Gold.
+// scenes.js — procedural Solmar Bay scene painters.
+// Every scene is drawn in code on a 2D canvas: no photos, no Rockstar art.
+// Each painter receives (ctx, x, y, w, h) for its panel rectangle and paints
+// only inside it. All randomness is seeded, so a scene is deterministic.
 
-export const GRADES = {
-  sunset: {
-    name: 'Sunset',
-    skyTop: '#241a5e', skyMid: '#7b3fa0', skyLow: '#ff7e3d',
-    sun: '#ffd166', sunStripe: '#ff6b4a',
-    sea: '#1d3a5f', seaDark: '#0e1e33', seaLine: '#e8a04c',
-    accent: '#ff5a7a', glow: '#ff9e57', neon: '#ff5a7a', neon2: '#00e5ff',
-  },
-  neon: {
-    name: 'Neon Nights',
-    skyTop: '#12063a', skyMid: '#5b1a8a', skyLow: '#ff2e88',
-    sun: '#ff4d9d', sunStripe: '#ff2e63',
-    sea: '#12233f', seaDark: '#0a1226', seaLine: '#ff4d9d',
-    accent: '#00e5ff', glow: '#ff2e88', neon: '#ff2e88', neon2: '#00e5ff',
-  },
-  gold: {
-    name: 'Vice Gold',
-    skyTop: '#2b1d05', skyMid: '#8a5a10', skyLow: '#ffb830',
-    sun: '#ffe9a8', sunStripe: '#ff8a00',
-    sea: '#24382e', seaDark: '#101f18', seaLine: '#ffcf5e',
-    accent: '#ff8a00', glow: '#ffd166', neon: '#ffb830', neon2: '#7dffd4',
-  },
-};
+export const SCENES = [
+  { id: 'sunset', name: 'Dani at Sunset', hint: 'Driver at golden hour' },
+  { id: 'boat', name: 'Boat Chase', hint: 'Speedboat on open water' },
+  { id: 'lighthouse', name: 'Lighthouse Docks', hint: 'Dusk at the pier' },
+  { id: 'neon', name: 'Neon Street', hint: 'Vice City nights' },
+];
 
-/** Vertical sky gradient across a panel. */
-function skyFill(ctx, x, y, w, h, pal) {
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, pal.skyTop);
-  g.addColorStop(0.55, pal.skyMid);
-  g.addColorStop(1, pal.skyLow);
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, w, h);
+export const GRADES = [
+  { id: 'sunset', name: 'Sunset', top: 'rgba(255,122,26,0.20)', bottom: 'rgba(255,45,120,0.14)', accent: '#ff7a1a' },
+  { id: 'neon', name: 'Neon Nights', top: 'rgba(255,0,168,0.16)', bottom: 'rgba(0,214,255,0.16)', accent: '#ff00a8' },
+  { id: 'gold', name: 'Vice Gold', top: 'rgba(255,190,60,0.18)', bottom: 'rgba(0,140,140,0.10)', accent: '#ffc23c' },
+];
+
+// Small seeded PRNG so scenes look the same on every load.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-/** A big low sun with horizontal slats cut through it, synthwave style. */
-function stripedSun(ctx, cx, cy, r, pal) {
-  ctx.save();
-  ctx.shadowColor = pal.glow;
-  ctx.shadowBlur = r * 0.45;
-  ctx.fillStyle = pal.sun;
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function vgrad(ctx, x, y, w, h, stops) {
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  for (const [at, color] of stops) g.addColorStop(at, color);
+  return g;
+}
+
+function disc(ctx, x, y, r, color) {
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-  ctx.save();
-  ctx.fillStyle = pal.sunStripe;
-  const stripes = [0.05, 0.22, 0.42];
-  for (const t of stripes) {
-    const yy = cy + r * t;
-    const half = Math.sqrt(Math.max(0, r * r - (yy - cy) * (yy - cy)));
-    const th = Math.max(2, r * 0.055);
-    ctx.fillRect(cx - half, yy - th / 2, half * 2, th);
-  }
-  ctx.restore();
 }
 
-/** A dark skyline of blocks with a few lit windows. */
-function skyline(ctx, x, baseY, w, h, pal, seed) {
+function sunGlow(ctx, x, y, r, color) {
+  const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 2.6);
+  g.addColorStop(0, color);
+  g.addColorStop(1, 'rgba(255,120,40,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// A palm silhouette: curved trunk and six drooping fronds.
+function palm(ctx, x, y, s, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(2, s * 0.06);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x + s * 0.12, y - s * 0.55, x + s * 0.3, y - s * 0.95);
+  ctx.stroke();
+  const topX = x + s * 0.3;
+  const topY = y - s * 0.95;
+  for (let i = 0; i < 6; i++) {
+    const a = (-0.15 - i * 0.28) * Math.PI;
+    const len = s * (0.42 + (i % 2) * 0.1);
+    const ex = topX + Math.cos(a) * len;
+    const ey = topY + Math.sin(a) * len * 0.55 + s * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.quadraticCurveTo(topX + Math.cos(a) * len * 0.5, topY - s * 0.08, ex, ey);
+    ctx.lineWidth = Math.max(2, s * 0.045);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(topX, topY, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Blocky skyline silhouette with a few lit windows.
+function skyline(ctx, x, y, w, h, color, seed) {
+  const rnd = mulberry32(seed);
+  ctx.fillStyle = color;
   let bx = x;
-  let i = 0;
-  ctx.fillStyle = '#160f33';
   while (bx < x + w) {
-    const bw = w * (0.07 + ((seed * 37 + i * 53) % 10) / 130);
-    const bh = h * (0.35 + ((seed * 11 + i * 29) % 10) / 18);
-    ctx.fillRect(bx, baseY - bh, bw, bh);
-    ctx.fillStyle = '#ffe9a8';
-    const rows = Math.floor(bh / (h * 0.09));
-    const cols = Math.floor(bw / (w * 0.035));
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if ((seed + i * 7 + r * 3 + c * 5) % 4 === 0) {
-          ctx.fillRect(bx + w * 0.012 + c * w * 0.035, baseY - bh + h * 0.03 + r * h * 0.09, w * 0.014, h * 0.035);
+    const bw = w * (0.06 + rnd() * 0.1);
+    const bh = h * (0.25 + rnd() * 0.55);
+    ctx.fillRect(bx, y + h - bh, bw, bh);
+    if (rnd() > 0.5) ctx.fillRect(bx + bw * 0.3, y + h - bh - h * 0.08, bw * 0.4, h * 0.08);
+    bx += bw + w * 0.012;
+  }
+  ctx.fillStyle = 'rgba(255,214,120,0.85)';
+  for (let i = 0; i < 14; i++) {
+    const wx = x + rnd() * w;
+    const wy = y + h * 0.35 + rnd() * h * 0.5;
+    ctx.fillRect(wx, wy, Math.max(2, w * 0.008), Math.max(2, h * 0.012));
+  }
+}
+
+// A low-slung getaway car silhouette, side view, facing right.
+function carSide(ctx, x, y, w, color) {
+  const h = w * 0.26;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w * 0.08, y - h * 0.42);
+  ctx.lineTo(x + w * 0.34, y - h * 0.78);
+  ctx.lineTo(x + w * 0.62, y - h * 0.78);
+  ctx.lineTo(x + w * 0.86, y - h * 0.38);
+  ctx.lineTo(x + w, y - h * 0.18);
+  ctx.lineTo(x + w, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(140,220,255,0.5)';
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.16, y - h * 0.38);
+  ctx.lineTo(x + w * 0.36, y - h * 0.68);
+  ctx.lineTo(x + w * 0.58, y - h * 0.68);
+  ctx.lineTo(x + w * 0.78, y - h * 0.36);
+  ctx.closePath();
+  ctx.fill();
+  for (const wx of [0.24, 0.76]) {
+    disc(ctx, x + w * wx, y, w * 0.11, '#0a0a12');
+    disc(ctx, x + w * wx, y, w * 0.05, '#3a3a4a');
+  }
+  ctx.fillStyle = 'rgba(255,240,170,0.95)';
+  ctx.fillRect(x + w * 0.97, y - h * 0.3, w * 0.03, h * 0.12);
+}
+
+// A person leaning on the car: head, shoulders, one arm down.
+function driver(ctx, x, y, s, color) {
+  ctx.fillStyle = color;
+  disc(ctx, x, y - s * 0.82, s * 0.13, color);
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.16, y);
+  ctx.quadraticCurveTo(x - s * 0.2, y - s * 0.62, x, y - s * 0.66);
+  ctx.quadraticCurveTo(x + s * 0.2, y - s * 0.62, x + s * 0.16, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = s * 0.07;
+  ctx.beginPath();
+  ctx.moveTo(x + s * 0.14, y - s * 0.5);
+  ctx.lineTo(x + s * 0.3, y - s * 0.08);
+  ctx.stroke();
+}
+
+function paintSunset(ctx, x, y, w, h) {
+  ctx.fillStyle = vgrad(ctx, x, y, w, h, [[0, '#2b1055'], [0.35, '#c13b78'], [0.62, '#ff7a3c'], [1, '#ffb347']]);
+  ctx.fillRect(x, y, w, h);
+  clouds(ctx, x, y, w, h * 0.5, '#ffd9c2', 3);
+  sunGlow(ctx, x + w * 0.62, y + h * 0.52, h * 0.16, 'rgba(255,190,90,0.85)');
+  disc(ctx, x + w * 0.62, y + h * 0.52, h * 0.13, '#ffd98a');
+  const seaY = y + h * 0.62;
+  ctx.fillStyle = vgrad(ctx, x, seaY, w, h * 0.38, [[0, '#ff8c42'], [1, '#5b1a5e']]);
+  ctx.fillRect(x, seaY, w, h - (seaY - y));
+  const rnd = mulberry32(7);
+  ctx.fillStyle = 'rgba(255,235,180,0.5)';
+  for (let i = 0; i < 9; i++) {
+    const ry = seaY + (h - (seaY - y)) * (0.1 + rnd() * 0.85);
+    const rw = w * (0.06 + rnd() * 0.16);
+    ctx.fillRect(x + w * 0.62 - rw / 2 + (rnd() - 0.5) * w * 0.1, ry, rw, Math.max(2, h * 0.012));
+  }
+  skyline(ctx, x, y + h * 0.18, w, h * 0.44, '#1c0b33', 11);
+  palm(ctx, x + w * 0.06, y + h * 0.66, h * 0.34, '#14082a');
+  palm(ctx, x + w * 0.93, y + h * 0.68, h * 0.28, '#14082a');
+  ctx.fillStyle = '#160a2e';
+  ctx.fillRect(x, y + h * 0.86, w, h * 0.14);
+  carSide(ctx, x + w * 0.3, y + h * 0.88, w * 0.42, '#0d0718');
+  driver(ctx, x + w * 0.24, y + h * 0.88, h * 0.2, '#0d0718');
+}
+
+function paintBoat(ctx, x, y, w, h) {
+  ctx.fillStyle = vgrad(ctx, x, y, w, h, [[0, '#0b3d66'], [0.45, '#1d7a9e'], [0.62, '#2fa8a0'], [1, '#0a2e4d']]);
+  ctx.fillRect(x, y, w, h);
+  clouds(ctx, x, y, w, h * 0.45, '#bfe8ef', 17);
+  gulls(ctx, x, y, w, h, 29);
+  sunGlow(ctx, x + w * 0.2, y + h * 0.2, h * 0.12, 'rgba(255,240,200,0.7)');
+  disc(ctx, x + w * 0.2, y + h * 0.2, h * 0.09, '#fff3c4');
+  const seaY = y + h * 0.55;
+  ctx.fillStyle = vgrad(ctx, x, seaY, w, h * 0.45, [[0, '#2fa8a0'], [1, '#062a44']]);
+  ctx.fillRect(x, seaY, w, h - (seaY - y));
+  const rnd = mulberry32(23);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = Math.max(2, h * 0.012);
+  for (let i = 0; i < 7; i++) {
+    const wy = seaY + (h - (seaY - y)) * (0.12 + rnd() * 0.8);
+    ctx.beginPath();
+    ctx.moveTo(x + rnd() * w * 0.5, wy);
+    ctx.quadraticCurveTo(x + w * 0.4, wy - h * 0.02, x + w * (0.6 + rnd() * 0.35), wy);
+    ctx.stroke();
+  }
+  // Wake trailing behind the boat: a widening V of foam lines, not a solid shape.
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = Math.max(2, h * 0.014);
+  for (let i = 0; i < 3; i++) {
+    const wy = y + h * (0.7 + i * 0.03);
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y + h * 0.7);
+    ctx.lineTo(x + w * 0.16, wy);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y + h * 0.7);
+    ctx.lineTo(x + w * 0.16, y + h * (0.78 + i * 0.02));
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  for (let i = 0; i < 8; i++) {
+    disc(ctx, x + w * (0.2 + rnd() * 0.28), y + h * (0.72 + rnd() * 0.1), h * 0.012 + rnd() * h * 0.02, 'rgba(255,255,255,0.5)');
+  }
+  // Speedboat: long sleek hull with a pointed bow, dark windshield,
+  // a seated driver and an outboard motor at the stern.
+  const bx = x + w * 0.48;
+  const by = y + h * 0.68;
+  ctx.fillStyle = '#0e2438';
+  ctx.fillRect(bx + w * 0.005, by - h * 0.075, w * 0.02, h * 0.1);
+  ctx.fillStyle = '#f2f7fa';
+  ctx.beginPath();
+  ctx.moveTo(bx, by - h * 0.07);
+  ctx.lineTo(bx + w * 0.2, by - h * 0.1);
+  ctx.lineTo(bx + w * 0.36, by - h * 0.02);
+  ctx.lineTo(bx + w * 0.33, by + h * 0.045);
+  ctx.lineTo(bx + w * 0.02, by + h * 0.045);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff5a3c';
+  ctx.beginPath();
+  ctx.moveTo(bx + w * 0.02, by - h * 0.01);
+  ctx.lineTo(bx + w * 0.34, by - h * 0.008);
+  ctx.lineTo(bx + w * 0.33, by + h * 0.018);
+  ctx.lineTo(bx + w * 0.02, by + h * 0.018);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(16,42,72,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(bx + w * 0.09, by - h * 0.075);
+  ctx.lineTo(bx + w * 0.16, by - h * 0.13);
+  ctx.lineTo(bx + w * 0.21, by - h * 0.075);
+  ctx.closePath();
+  ctx.fill();
+  disc(ctx, bx + w * 0.135, by - h * 0.135, h * 0.02, '#0e2438');
+  ctx.fillStyle = '#0e2438';
+  ctx.fillRect(bx + w * 0.125, by - h * 0.12, w * 0.02, h * 0.05);
+}
+
+function paintLighthouse(ctx, x, y, w, h) {
+  ctx.fillStyle = vgrad(ctx, x, y, w, h, [[0, '#120e2e'], [0.5, '#3c2a63'], [0.75, '#c65f7a'], [1, '#2a1a3e']]);
+  ctx.fillRect(x, y, w, h);
+  const rnd = mulberry32(41);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  for (let i = 0; i < 26; i++) disc(ctx, x + rnd() * w, y + rnd() * h * 0.5, 1 + rnd() * 1.6, 'rgba(255,255,255,0.85)');
+  const seaY = y + h * 0.66;
+  ctx.fillStyle = vgrad(ctx, x, seaY, w, h * 0.34, [[0, '#7a4a6e'], [1, '#120e2e']]);
+  ctx.fillRect(x, seaY, w, h - (seaY - y));
+  ctx.fillStyle = 'rgba(255,230,150,0.35)';
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(x + w * 0.6 - w * 0.03, seaY + (h - (seaY - y)) * (0.12 + i * 0.14), w * 0.06, Math.max(2, h * 0.01));
+  }
+  // Lighthouse tower with stripes.
+  const tx = x + w * 0.6;
+  const tw = w * 0.11;
+  const topY = y + h * 0.16;
+  const botY = seaY + h * 0.04;
+  ctx.fillStyle = '#f2ead8';
+  ctx.beginPath();
+  ctx.moveTo(tx - tw * 0.42, botY);
+  ctx.lineTo(tx - tw * 0.3, topY);
+  ctx.lineTo(tx + tw * 0.3, topY);
+  ctx.lineTo(tx + tw * 0.42, botY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#c0392b';
+  for (let i = 0; i < 3; i++) {
+    const sy = lerp(topY, botY, 0.18 + i * 0.27);
+    const sw = lerp(tw * 0.62, tw * 0.82, 0.18 + i * 0.27);
+    ctx.fillRect(tx - sw / 2, sy, sw, (botY - topY) * 0.09);
+  }
+  ctx.fillStyle = '#1a1a26';
+  ctx.fillRect(tx - tw * 0.36, topY - h * 0.05, tw * 0.72, h * 0.05);
+  disc(ctx, tx, topY - h * 0.05, tw * 0.16, '#ffe9a8');
+  sunGlow(ctx, tx, topY - h * 0.05, h * 0.05, 'rgba(255,233,168,0.8)');
+  // Light beam sweeping right.
+  ctx.fillStyle = 'rgba(255,233,168,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(tx, topY - h * 0.05);
+  ctx.lineTo(x + w, topY - h * 0.16);
+  ctx.lineTo(x + w, topY + h * 0.1);
+  ctx.closePath();
+  ctx.fill();
+  // Rocks and dock planks.
+  ctx.fillStyle = '#0e0a1e';
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + h * 0.9);
+  ctx.lineTo(x + w * 0.3, y + h * 0.86);
+  ctx.lineTo(x + w * 0.42, y + h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#3a2418';
+  ctx.fillRect(x + w * 0.68, y + h * 0.9, w * 0.32, h * 0.1);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + w * (0.68 + i * 0.08), y + h * 0.9, 2, h * 0.1);
+}
+
+function paintNeon(ctx, x, y, w, h) {
+  ctx.fillStyle = vgrad(ctx, x, y, w, h, [[0, '#05060f'], [0.6, '#0d1030'], [1, '#1b0f38']]);
+  ctx.fillRect(x, y, w, h);
+  const rnd = mulberry32(67);
+  const neons = ['#ff2ea6', '#00e5ff', '#ffe14d', '#7cff4d', '#ff5a3c'];
+  // Building blocks with lit windows.
+  let bx = x;
+  while (bx < x + w) {
+    const bw = w * (0.14 + rnd() * 0.16);
+    const bh = h * (0.3 + rnd() * 0.45);
+    ctx.fillStyle = '#0a0c1e';
+    ctx.fillRect(bx, y + h * 0.72 - bh, bw, bh);
+    for (let wy = y + h * 0.72 - bh + h * 0.04; wy < y + h * 0.68; wy += h * 0.07) {
+      for (let wx = bx + w * 0.02; wx < bx + bw - w * 0.02; wx += w * 0.05) {
+        if (rnd() > 0.45) {
+          ctx.fillStyle = neons[Math.floor(rnd() * neons.length)];
+          ctx.globalAlpha = 0.75;
+          ctx.fillRect(wx, wy, w * 0.028, h * 0.035);
+          ctx.globalAlpha = 1;
         }
       }
     }
-    ctx.fillStyle = '#160f33';
-    bx += bw + w * 0.012;
-    i++;
+    bx += bw + w * 0.02;
   }
+  // Neon sign bars glowing over the street.
+  for (let i = 0; i < 4; i++) {
+    const sy = y + h * (0.18 + i * 0.13);
+    const sw = w * (0.2 + rnd() * 0.25);
+    const sx = x + rnd() * (w - sw);
+    const c = neons[i % neons.length];
+    ctx.save();
+    ctx.shadowColor = c;
+    ctx.shadowBlur = h * 0.06;
+    ctx.fillStyle = c;
+    ctx.fillRect(sx, sy, sw, h * 0.028);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(sx + sw * 0.1, sy + h * 0.006, sw * 0.5, h * 0.014);
+  }
+  // Wet street with reflections.
+  ctx.fillStyle = vgrad(ctx, x, y + h * 0.72, w, h * 0.28, [[0, '#141033'], [1, '#05060f']]);
+  ctx.fillRect(x, y + h * 0.72, w, h * 0.28);
+  ctx.fillStyle = 'rgba(255,46,166,0.25)';
+  ctx.fillRect(x + w * 0.15, y + h * 0.74, w * 0.1, h * 0.24);
+  ctx.fillStyle = 'rgba(0,229,255,0.22)';
+  ctx.fillRect(x + w * 0.62, y + h * 0.74, w * 0.08, h * 0.24);
+  carSide(ctx, x + w * 0.28, y + h * 0.9, w * 0.44, '#05060f');
+  disc(ctx, x + w * 0.72, y + h * 0.86, h * 0.03, 'rgba(255,240,170,0.95)');
+  ctx.fillStyle = 'rgba(255,240,170,0.18)';
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.72, y + h * 0.86);
+  ctx.lineTo(x + w * 0.98, y + h * 0.8);
+  ctx.lineTo(x + w * 0.98, y + h * 0.92);
+  ctx.closePath();
+  ctx.fill();
 }
 
-/** A leaning palm silhouette. */
-function palmTree(ctx, x, y, s, lean, pal) {
+const PAINTERS = { sunset: paintSunset, boat: paintBoat, lighthouse: paintLighthouse, neon: paintNeon };
+
+export function paintScene(ctx, sceneId, x, y, w, h) {
+  const paint = PAINTERS[sceneId] || PAINTERS.sunset;
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(lean);
-  ctx.strokeStyle = '#160f33';
-  ctx.lineWidth = Math.max(2, s * 0.03);
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(s * 0.06, -s * 0.5, s * 0.02, -s);
-  ctx.stroke();
-  ctx.lineWidth = Math.max(1.5, s * 0.016);
-  for (let k = 0; k < 7; k++) {
-    const a = -Math.PI * (0.08 + k * 0.13);
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  paint(ctx, x, y, w, h);
+  ctx.restore();
+}
+
+// Colour grade wash over the whole cover, plus a soft vignette.
+export function applyGrade(ctx, gradeId, w, h) {
+  const grade = GRADES.find((g) => g.id === gradeId) || GRADES[0];
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, grade.top);
+  g.addColorStop(1, grade.bottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+  const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.max(w, h) * 0.75);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(0,0,0,0.32)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+}
+
+export function gradeAccent(gradeId) {
+  const grade = GRADES.find((g) => g.id === gradeId) || GRADES[0];
+  return grade.accent;
+}
+
+// Thin cloud streaks, tinted by the sky around them.
+function clouds(ctx, x, y, w, h, color, seed) {
+  const rnd = mulberry32(seed);
+  ctx.fillStyle = color;
+  for (let i = 0; i < 5; i++) {
+    const cy = y + h * (0.08 + rnd() * 0.3);
+    const cw = w * (0.15 + rnd() * 0.25);
+    const cx = x + rnd() * (w - cw);
+    ctx.globalAlpha = 0.16 + rnd() * 0.14;
     ctx.beginPath();
-    ctx.moveTo(s * 0.02, -s);
-    ctx.quadraticCurveTo(Math.cos(a) * s * 0.42, -s + Math.sin(a) * s * 0.42, Math.cos(a) * s * 0.72, -s + Math.sin(a) * s * 0.72 + s * 0.16);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** Horizontal light streaks on dark water. */
-function seaStreaks(ctx, x, y, w, h, pal, seed) {
-  ctx.fillStyle = pal.sea;
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = pal.seaLine;
-  for (let k = 0; k < 7; k++) {
-    const yy = y + h * (0.12 + k * 0.13);
-    const ww = w * (0.25 + ((seed + k * 31) % 10) / 22);
-    const xx = x + w * (((seed * 13 + k * 47) % 60) / 100);
-    ctx.globalAlpha = 0.25 + (k % 3) * 0.2;
-    ctx.fillRect(xx, yy, ww, Math.max(1.5, h * 0.02));
-  }
-  ctx.globalAlpha = 1;
-}
-
-/** Dani Reyes from behind: short hair, jacket, standing at the water's edge. */
-function daniFigure(ctx, x, y, s, pal) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = '#0d0a24';
-  ctx.beginPath();
-  ctx.arc(0, -s * 0.78, s * 0.16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.2, s * 0.1);
-  ctx.quadraticCurveTo(-s * 0.26, -s * 0.55, -s * 0.13, -s * 0.62);
-  ctx.lineTo(s * 0.13, -s * 0.62);
-  ctx.quadraticCurveTo(s * 0.26, -s * 0.55, s * 0.2, s * 0.1);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = pal.accent;
-  ctx.fillRect(-s * 0.2, -s * 0.28, s * 0.4, s * 0.05);
-  ctx.fillStyle = pal.sun;
-  ctx.fillRect(s * 0.2, -s * 0.5, s * 0.03, s * 0.62);
-  ctx.restore();
-}
-
-/** A low wedge sports car silhouette with one headlight. */
-function wedgeCar(ctx, x, y, s, pal) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = '#0d0a24';
-  ctx.beginPath();
-  ctx.moveTo(-s, 0);
-  ctx.lineTo(-s * 0.55, -s * 0.34);
-  ctx.lineTo(s * 0.25, -s * 0.4);
-  ctx.lineTo(s, -s * 0.1);
-  ctx.lineTo(s, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = pal.sun;
-  ctx.beginPath();
-  ctx.arc(-s * 0.62, s * 0.02, s * 0.09, 0, Math.PI * 2);
-  ctx.arc(s * 0.55, s * 0.02, s * 0.09, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = pal.sun;
-  ctx.lineWidth = Math.max(1.5, s * 0.03);
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.55, -s * 0.34);
-  ctx.lineTo(s * 0.25, -s * 0.4);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/** A speedboat with a white wake and red/blue police glow behind it. */
-function speedBoat(ctx, x, y, s, pal) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = '#f4ead8';
-  ctx.beginPath();
-  ctx.moveTo(-s, -s * 0.1);
-  ctx.lineTo(s, -s * 0.1);
-  ctx.lineTo(s * 0.7, s * 0.22);
-  ctx.lineTo(-s * 0.7, s * 0.22);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#160f33';
-  ctx.fillRect(-s * 0.25, -s * 0.55, s * 0.5, s * 0.45);
-  ctx.fillStyle = pal.accent;
-  ctx.fillRect(-s * 0.25, -s * 0.2, s * 0.5, s * 0.1);
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-  ctx.lineWidth = Math.max(1.5, s * 0.05);
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.95, s * 0.28);
-  ctx.lineTo(-s * 1.9, s * 0.55);
-  ctx.moveTo(-s * 0.95, s * 0.42);
-  ctx.lineTo(-s * 1.8, s * 0.72);
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  for (let k = 0; k < 8; k++) {
-    ctx.beginPath();
-    ctx.arc(-s * (1.1 + k * 0.12), s * (0.3 + (k % 3) * 0.14), s * 0.05, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, cw / 2, h * 0.018, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.restore();
-}
-
-/** A striped lighthouse with a sweeping beam. */
-function lighthouse(ctx, x, y, s, pal) {
-  ctx.save();
-  ctx.translate(x, y);
-  const beam = ctx.createLinearGradient(0, -s * 0.95, s * 1.6, -s * 0.7);
-  beam.addColorStop(0, 'rgba(255,233,168,0.85)');
-  beam.addColorStop(1, 'rgba(255,233,168,0)');
-  ctx.fillStyle = beam;
-  ctx.beginPath();
-  ctx.moveTo(0, -s * 0.95);
-  ctx.lineTo(s * 1.7, -s * 1.15);
-  ctx.lineTo(s * 1.7, -s * 0.55);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#f4ead8';
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.16, 0);
-  ctx.lineTo(-s * 0.09, -s);
-  ctx.lineTo(s * 0.09, -s);
-  ctx.lineTo(s * 0.16, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = pal.accent;
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.13, -s * 0.42);
-  ctx.lineTo(-s * 0.1, -s * 0.66);
-  ctx.lineTo(s * 0.1, -s * 0.66);
-  ctx.lineTo(s * 0.13, -s * 0.42);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#160f33';
-  ctx.fillRect(-s * 0.12, -s * 1.08, s * 0.24, s * 0.1);
-  ctx.fillStyle = pal.sun;
-  ctx.beginPath();
-  ctx.arc(0, -s * 0.99, s * 0.07, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-/** Dani at Sunset: big striped sun, skyline, Dani and his car at the water. */
-export function paintDaniSunset(ctx, x, y, w, h, pal) {
-  skyFill(ctx, x, y, w, h, pal);
-  stripedSun(ctx, x + w * 0.62, y + h * 0.34, Math.min(w, h) * 0.26, pal);
-  const horizon = y + h * 0.52;
-  skyline(ctx, x, horizon, w, h * 0.2, pal, 3);
-  palmTree(ctx, x + w * 0.07, horizon + h * 0.02, h * 0.3, -0.12, pal);
-  palmTree(ctx, x + w * 0.93, horizon + h * 0.02, h * 0.26, 0.14, pal);
-  seaStreaks(ctx, x, horizon, w, y + h - horizon, pal, 5);
-  wedgeCar(ctx, x + w * 0.58, y + h * 0.8, Math.min(w, h) * 0.24, pal);
-  daniFigure(ctx, x + w * 0.16, y + h * 0.82, Math.min(w, h) * 0.3, pal);
-}
-
-/** Boat Chase: a speedboat tearing across dusk water under a low sun. */
-export function paintBoatChase(ctx, x, y, w, h, pal) {
-  skyFill(ctx, x, y, w, h, pal);
-  stripedSun(ctx, x + w * 0.78, y + h * 0.26, Math.min(w, h) * 0.17, pal);
-  const horizon = y + h * 0.48;
-  seaStreaks(ctx, x, horizon, w, y + h - horizon, pal, 9);
-  ctx.save();
-  ctx.shadowColor = '#ff2e63';
-  ctx.shadowBlur = h * 0.12;
-  ctx.fillStyle = '#ff2e63';
-  ctx.beginPath();
-  ctx.arc(x + w * 0.14, horizon + h * 0.05, h * 0.05, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowColor = '#2e7dff';
-  ctx.fillStyle = '#2e7dff';
-  ctx.beginPath();
-  ctx.arc(x + w * 0.22, horizon + h * 0.06, h * 0.05, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  speedBoat(ctx, x + w * 0.58, y + h * 0.72, Math.min(w, h) * 0.2, pal);
-}
-
-/** Lighthouse Docks: striped lighthouse, beam, a small boat on calm water. */
-export function paintLighthouseDocks(ctx, x, y, w, h, pal) {
-  skyFill(ctx, x, y, w, h, pal);
-  stripedSun(ctx, x + w * 0.3, y + h * 0.3, Math.min(w, h) * 0.18, pal);
-  const horizon = y + h * 0.58;
-  seaStreaks(ctx, x, horizon, w, y + h - horizon, pal, 2);
-  ctx.fillStyle = '#160f33';
-  ctx.beginPath();
-  ctx.moveTo(x, y + h);
-  ctx.lineTo(x + w * 0.55, y + h * 0.86);
-  ctx.lineTo(x + w, y + h * 0.94);
-  ctx.lineTo(x + w, y + h);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#0d0a24';
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.18, y + h * 0.78);
-  ctx.lineTo(x + w * 0.42, y + h * 0.78);
-  ctx.lineTo(x + w * 0.36, y + h * 0.84);
-  ctx.lineTo(x + w * 0.24, y + h * 0.84);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(x + w * 0.29, y + h * 0.66, w * 0.012, h * 0.12);
-  lighthouse(ctx, x + w * 0.78, y + h * 0.92, Math.min(w, h) * 0.42, pal);
-}
-
-/** Neon Street: dark boulevard, glowing signs, a car under pink and cyan light. */
-export function paintNeonStreet(ctx, x, y, w, h, pal) {
-  ctx.fillStyle = '#12082e';
-  ctx.fillRect(x, y, w, h);
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, '#1c0b45');
-  g.addColorStop(0.6, '#3d1157');
-  g.addColorStop(1, '#12082e');
-  ctx.fillStyle = g;
-  ctx.fillRect(x, y, w, h * 0.62);
-  const signs = [
-    { label: 'BAR', cx: 0.18, cy: 0.24, color: pal.neon },
-    { label: 'HOTEL', cx: 0.78, cy: 0.2, color: pal.neon2 },
-    { label: 'TACOS', cx: 0.5, cy: 0.36, color: pal.sun },
-  ];
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (const s of signs) {
-    const sw = w * 0.2;
-    const sh = h * 0.11;
-    const sx = x + w * s.cx - sw / 2;
-    const sy = y + h * s.cy - sh / 2;
-    ctx.save();
-    ctx.shadowColor = s.color;
-    ctx.shadowBlur = h * 0.06;
-    ctx.fillStyle = s.color;
-    ctx.fillRect(sx, sy, sw, sh);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#12082e';
-    ctx.font = `900 ${Math.round(h * 0.075)}px Arial, sans-serif`;
-    ctx.fillText(s.label, x + w * s.cx, y + h * s.cy + 1);
-    ctx.restore();
-  }
-  ctx.fillStyle = '#0a0618';
-  ctx.fillRect(x, y + h * 0.62, w, h * 0.38);
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = pal.neon;
-  ctx.fillRect(x + w * 0.08, y + h * 0.62, w * 0.2, h * 0.38);
-  ctx.fillStyle = pal.neon2;
-  ctx.fillRect(x + w * 0.68, y + h * 0.62, w * 0.2, h * 0.38);
   ctx.globalAlpha = 1;
-  wedgeCar(ctx, x + w * 0.5, y + h * 0.82, Math.min(w, h) * 0.26, pal);
-  palmTree(ctx, x + w * 0.06, y + h * 0.64, h * 0.3, -0.1, pal);
 }
 
-/** All four scene painters by id, in panel-picker order. */
-export const SCENES = {
-  dani: { name: 'Dani at Sunset', paint: paintDaniSunset },
-  boat: { name: 'Boat Chase', paint: paintBoatChase },
-  lighthouse: { name: 'Lighthouse Docks', paint: paintLighthouseDocks },
-  neon: { name: 'Neon Street', paint: paintNeonStreet },
-};
+// Two tiny gulls in the sky.
+function gulls(ctx, x, y, w, h, seed) {
+  const rnd = mulberry32(seed);
+  ctx.strokeStyle = 'rgba(20,10,30,0.8)';
+  ctx.lineWidth = Math.max(1.5, h * 0.006);
+  for (let i = 0; i < 2; i++) {
+    const gx = x + w * (0.3 + rnd() * 0.4);
+    const gy = y + h * (0.12 + rnd() * 0.18);
+    const s = w * 0.02;
+    ctx.beginPath();
+    ctx.moveTo(gx - s, gy);
+    ctx.quadraticCurveTo(gx - s * 0.4, gy - s * 0.6, gx, gy);
+    ctx.quadraticCurveTo(gx + s * 0.4, gy - s * 0.6, gx + s, gy);
+    ctx.stroke();
+  }
+}

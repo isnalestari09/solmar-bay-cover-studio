@@ -1,31 +1,12 @@
-[![Make GTA 6 Cover Art](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01)
-[![Rank](https://make.fun/badge/gta6-cover-art-01/isnalestari09/solmar-bay-cover-studio/rank.svg)](https://make.fun/bounty/gta6-cover-art-01)
-[![Reward](https://make.fun/badge/gta6-cover-art-01/isnalestari09/solmar-bay-cover-studio/reward.svg)](https://make.fun/bounty/gta6-cover-art-01)
+[![make.fun](https://make.fun/badge/gta6-cover-art-01.svg)](https://make.fun/bounty/gta6-cover-art-01)
+[![rank](https://make.fun/badge/gta6-cover-art-01/isnalestari09/solmar-bay-cover-studio/rank.svg)](https://make.fun/bounty/gta6-cover-art-01)
+[![reward](https://make.fun/badge/gta6-cover-art-01/isnalestari09/solmar-bay-cover-studio/reward.svg)](https://make.fun/bounty/gta6-cover-art-01)
 
 # Solmar Bay Cover Studio
 
-A GTA-style cover art maker that runs offline in your browser — an entry for
-make.fun's **Make GTA 6 Cover Art** bounty (`gta6-cover-art-01`). Pick a post
-size, fill each of the three diagonal panels with a drawn Solmar Bay scene or
-your own photo (drag to pan, zoom slider to crop), write the title, subtitle
-and tagline, pick a colour grade, and export a PNG to share.
+A GTA-style cover art maker for the fictional game **Solmar Bay** — Dani Reyes, getaway driver, coastal sunset, lighthouse docks, boat chase. Pick a size, fill three diagonal panels with drawn Solmar Bay scenes or your own photos (upload, drag to pan, zoom to crop), edit the title, subtitle and tagline, pick a colour grade, and export a PNG to share.
 
-The cover is for the fictional game **Solmar Bay** — Dani Reyes, getaway driver,
-coastal sunset, lighthouse docks, boat chase. All art is original and drawn in
-code; no Rockstar Games logo, artwork or font is used anywhere.
-
-## How it works
-
-1. **Size** — Square 1080 × 1080, Portrait 1080 × 1350, or Wide 1920 × 1080.
-2. **Panels** — click a panel, then choose one of four drawn scenes (Dani at
-   Sunset, Boat Chase, Lighthouse Docks, Neon Street) or upload your own photo,
-   or use a kit sample (Pier, Boulevard). One photo can fill several panels.
-3. **Words** — edit the title, subtitle and tagline; the lettering re-draws live.
-4. **Grade** — Sunset, Neon Nights, or Vice Gold.
-5. **Export PNG** — the cover is rendered at full post size and downloaded.
-
-Everything runs from static files under `app/` — no network request, no upload,
-photos never leave your machine.
+All art is original and drawn in code. No Rockstar Games logo, artwork or font.
 
 ## Try it
 
@@ -34,25 +15,33 @@ node serve.ts
 # open http://localhost:8080
 ```
 
-Deterministic screenshots: `?shot=cover&size=wide|square|portrait` draws a cover
-full-frame; `?shot=editor` opens the editor with the pier sample photo loaded.
+Or open `app/index.html` from any static file server. The app works fully offline — every script, style and image it loads is a file under `app/`, and your photos are read on your own machine, never uploaded.
 
-## Build the entry
+## What it does
+
+- **Three diagonal panels** per cover, split by slanted dividers with an accent edge.
+- **Four procedural scenes**, all painted in code: Dani at Sunset, Boat Chase, Lighthouse Docks, Neon Street.
+- **Any photo**: upload your own, or use the two free sample photos (pier, boulevard). Drag to position, zoom slider to crop, one photo per panel or the same photo in several.
+- **Three colour grades**: Sunset, Neon Nights, Vice Gold — a wash plus vignette over the whole cover.
+- **Bold caption lettering** on a slanted title band: title, subtitle and tagline, all editable live.
+- **Three post sizes**: Landscape 1920 × 1080, Square 1080 × 1080, Portrait 1080 × 1350.
+- **One-click PNG export** at full size, plus deterministic `?shot=` presets (`cover`, `editor`, `portrait`, `square`) for reproducible screenshots.
+
+## Screenshots
+
+- `1-cover.jpg` — the wide landscape cover the app exports.
+- `2-editor.jpg` — the editor with the pier sample photo loaded in panel 2.
+- `3-cover.jpg` — the portrait cover in the Neon Nights grade.
+- `4-cover.jpg` — the square cover in the Vice Gold grade.
+
+## Hand in
 
 ```sh
 mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-`main.ts` copies `app/` and `screenshots/` to the output directory and writes
-`dossier.json` with `buildDossier` from `vendor/makefun-app.ts`.
+`main.ts` copies `app/` and `screenshots/` to the output directory and writes `dossier.json` with the kit's `buildDossier`.
 
-## Screenshots
+## Entry
 
-- `1-cover.jpg` — wide cover (1920 × 1080 export)
-- `2-editor.jpg` — editor with the pier sample photo loaded
-- `3-cover.jpg` — portrait cover (1080 × 1350 export)
-- `4-cover.jpg` — square cover (1080 × 1080 export)
-
-## License
-
-MIT — see `LICENSE`.
+Built for the [make.fun GTA 6 Cover Art bounty](https://make.fun/bounty/gta6-cover-art-01) by [@isnalestari09](https://github.com/isnalestari09). Try make.fun yourself: https://make.fun/r/7fcw42xg
