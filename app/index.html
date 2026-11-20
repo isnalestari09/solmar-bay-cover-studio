@@ -1,80 +1,70 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Solmar Bay Cover Studio — turn your photo and a caption into GTA-style cover art, offline in your browser.">
 <title>Solmar Bay Cover Studio</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff7a1a'/%3E%3Ctext x='16' y='22' font-size='18' font-weight='900' text-anchor='middle' fill='%2312081e' font-family='Arial'%3ES%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <div>
-    <h1>Solmar Bay <span>Cover Studio</span></h1>
-    <p class="tag">Turn your photos into GTA-style cover art — offline, in your browser.</p>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">SB</span>
+    <div>
+      <h1>Solmar Bay <span>Cover Studio</span></h1>
+      <p>Turn your photo and a caption into GTA-style cover art — offline, in your browser.</p>
+    </div>
   </div>
-  <p class="credit">Original art, drawn in code. No Rockstar logos or artwork.</p>
+  <button id="exportBtn" type="button" class="export-btn">Export PNG</button>
 </header>
 
 <main class="layout">
-  <section class="preview" aria-label="Cover preview">
-    <canvas id="coverCanvas" width="1920" height="1080" aria-label="Your Solmar Bay cover art, drawn live"></canvas>
-    <noscript><p class="status">Solmar Bay Cover Studio needs JavaScript to draw your cover.</p></noscript>
-    <p class="hint">Click a panel to select it. Drag a photo panel to move it. Everything stays on your machine.</p>
-    <p id="status" class="status" role="status">Pick a size, fill the panels, write your caption, export a PNG.</p>
+  <section class="controls" aria-label="Cover controls">
+    <section class="group">
+      <h2>1 · Size</h2>
+      <div id="sizeRow" class="chip-row" role="group" aria-label="Cover size"></div>
+    </section>
+
+    <section class="group">
+      <h2>2 · Panels</h2>
+      <p class="note">Three diagonal panels. Pick a drawn scene for each, or drop in your own photo — drag the cover to move a photo, use the zoom slider to frame it.</p>
+      <div id="panels"></div>
+    </section>
+
+    <section class="group">
+      <h2>3 · Words</h2>
+      <label class="field">Title
+        <input id="titleInput" type="text" value="SOLMAR BAY" maxlength="40">
+      </label>
+      <label class="field">Subtitle
+        <input id="subtitleInput" type="text" value="A Dani Reyes Story" maxlength="60">
+      </label>
+      <label class="field">Tagline
+        <input id="taglineInput" type="text" value="Every sunset has a price." maxlength="80">
+      </label>
+    </section>
+
+    <section class="group">
+      <h2>4 · Colour grade</h2>
+      <div id="gradeRow" class="chip-row" role="group" aria-label="Colour grade"></div>
+    </section>
+
+    <button id="randomBtn" type="button" class="ghost-btn">Surprise me — random cover</button>
   </section>
 
-  <section class="controls" aria-label="Cover controls">
-    <fieldset>
-      <legend>1 · Size</legend>
-      <div class="row" id="sizeRow"></div>
-    </fieldset>
-
-    <fieldset>
-      <legend>2 · Colour grade</legend>
-      <div class="row" id="gradeRow"></div>
-    </fieldset>
-
-    <fieldset>
-      <legend>3 · Caption</legend>
-      <label>Title
-        <input id="titleInput" type="text" value="SOLMAR BAY" maxlength="24" autocomplete="off">
-      </label>
-      <label>Subtitle
-        <input id="subtitleInput" type="text" value="DANI REYES" maxlength="32" autocomplete="off">
-      </label>
-      <label>Tagline
-        <input id="taglineInput" type="text" value="One last drive. One last chance." maxlength="64" autocomplete="off">
-      </label>
-    </fieldset>
-
-    <fieldset>
-      <legend>4 · Selected panel</legend>
-      <p id="panelLabel" class="panel-label">Panel 1 — Dani at Sunset</p>
-      <div class="row" id="sceneRow"></div>
-      <div class="photo-tools">
-        <label class="upload">Upload a photo
-          <input id="photoInput" type="file" accept="image/*">
-        </label>
-        <div class="row" id="sampleRow"></div>
-        <label class="zoom">Zoom
-          <input id="zoomRange" type="range" min="0.5" max="3" step="0.05" value="1">
-          <span id="zoomValue">100%</span>
-        </label>
-        <button id="clearPhotoBtn" type="button" class="ghost">Back to a drawn scene</button>
-      </div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Try a preset</legend>
-      <div class="row" id="presetRow"></div>
-    </fieldset>
-
-    <button id="exportBtn" type="button" class="export">Export PNG</button>
-    <p class="fine">Exports at full size: 1920 × 1080, 1080 × 1080 or 1080 × 1350. Photos are read on your machine and never uploaded.</p>
+  <section class="stage" aria-label="Live preview">
+    <div class="canvas-wrap">
+      <canvas id="preview"></canvas>
+    </div>
+    <p class="stage-note">Live preview — click a panel to select it. Export downloads a full-resolution PNG. Press <kbd>E</kbd> to export, <kbd>R</kbd> for a random cover.</p>
   </section>
 </main>
 
-<script type="module" src="./src/main.js"></script>
+<footer class="foot">
+  <p>Solmar Bay is a fictional city. All art is drawn in code by this app — no photos are uploaded anywhere, and no licensed artwork is used.</p>
+</footer>
+
+<script type="module" src="src/main.js"></script>
 </body>
 </html>

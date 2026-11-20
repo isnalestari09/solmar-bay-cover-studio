@@ -1,19 +1,21 @@
-// serve.ts — serves app/ on http://localhost:8080 for local testing.
-// Node 22, standard library only. Run: node serve.ts
+// serve.ts — local preview server for Solmar Bay Cover Studio (Node 22,
+// stdlib only). Serves app/ as static files on http://localhost:8080/ with
+// no-store headers, so every edit shows up on reload. Nothing is served
+// from the network; the app itself makes no network requests.
 
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { dirname, extname, join, normalize } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { extname, join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), 'app');
-const port = Number(process.env.PORT || 8080);
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'app');
+const PORT = Number(process.env.PORT || 8080);
 
-const TYPES = {
+const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -21,22 +23,29 @@ const TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-const server = createServer((req, res) => {
-  const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-  const rel = normalize(urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, ''));
-  const file = join(root, rel);
-  if (!file.startsWith(root) || !existsSync(file) || !statSync(file).isFile()) {
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('not found\n');
-    return;
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url || '/', 'http://localhost');
+    const path = url.pathname === '/' ? '/index.html' : url.pathname;
+    const file = resolve(join(APP_ROOT, path));
+    if (!file.startsWith(APP_ROOT)) {
+      res.writeHead(403);
+      res.end('forbidden');
+      return;
+    }
+    const data = await readFile(file);
+    res.writeHead(200, {
+      'content-type': TYPES[extname(file)] || 'application/octet-stream',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    });
+    res.end(data);
+  } catch {
+    res.writeHead(404);
+    res.end('not found');
   }
-  res.writeHead(200, {
-    'content-type': TYPES[extname(file)] || 'application/octet-stream',
-    'cache-control': 'no-store',
-  });
-  res.end(readFileSync(file));
 });
 
-server.listen(port, () => {
-  console.log(`Solmar Bay Cover Studio at http://localhost:${port}/`);
+server.listen(PORT, () => {
+  console.log(`Solmar Bay Cover Studio at http://localhost:${PORT}/`);
 });
