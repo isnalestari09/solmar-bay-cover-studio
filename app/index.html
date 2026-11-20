@@ -3,68 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Solmar Bay Cover Studio — turn your photo and a caption into GTA-style cover art, offline in your browser.">
+<meta name="description" content="Solmar Bay Cover Studio — turn a photo and a caption into GTA-style multi-panel cover art, offline in your browser.">
 <title>Solmar Bay Cover Studio</title>
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<noscript><p style="padding: 20px; text-align: center;">Solmar Bay Cover Studio needs JavaScript to draw your cover.</p></noscript>
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark">SB</span>
+    <span class="logo" aria-hidden="true">SB</span>
     <div>
-      <h1>Solmar Bay <span>Cover Studio</span></h1>
+      <h1>SOLMAR BAY <em>COVER STUDIO</em></h1>
       <p>Turn your photo and a caption into GTA-style cover art — offline, in your browser.</p>
     </div>
   </div>
-  <button id="exportBtn" type="button" class="export-btn">Export PNG</button>
+  <button id="exportBtn" type="button">Export PNG</button>
 </header>
 
 <main class="layout">
-  <section class="controls" aria-label="Cover controls">
-    <section class="group">
-      <h2>1 · Size</h2>
-      <div id="sizeRow" class="chip-row" role="group" aria-label="Cover size"></div>
+  <aside class="controls" aria-label="Cover controls">
+    <section class="card">
+      <h2><span>1</span> · SIZE</h2>
+      <div class="row" id="sizeRow">
+        <button type="button" data-size="landscape" class="pill active">Landscape 16:9</button>
+        <button type="button" data-size="portrait" class="pill">Portrait 4:5</button>
+        <button type="button" data-size="square" class="pill">Square 1:1</button>
+      </div>
     </section>
 
-    <section class="group">
-      <h2>2 · Panels</h2>
+    <section class="card">
+      <h2><span>2</span> · PANELS</h2>
       <p class="note">Three diagonal panels. Pick a drawn scene for each, or drop in your own photo — drag the cover to move a photo, use the zoom slider to frame it.</p>
-      <div id="panels"></div>
+      <div id="panelCards"></div>
     </section>
 
-    <section class="group">
-      <h2>3 · Words</h2>
-      <label class="field">Title
-        <input id="titleInput" type="text" value="SOLMAR BAY" maxlength="40">
+    <section class="card">
+      <h2><span>3</span> · TEXT</h2>
+      <label>Title
+        <input id="titleInput" type="text" maxlength="24" value="SOLMAR BAY">
       </label>
-      <label class="field">Subtitle
-        <input id="subtitleInput" type="text" value="A Dani Reyes Story" maxlength="60">
+      <label>Subtitle
+        <input id="subtitleInput" type="text" maxlength="40" value="A DANI REYES STORY">
       </label>
-      <label class="field">Tagline
-        <input id="taglineInput" type="text" value="Every sunset has a price." maxlength="80">
+      <label>Tagline
+        <input id="taglineInput" type="text" maxlength="60" value="Every sunset has a price.">
       </label>
     </section>
 
-    <section class="group">
-      <h2>4 · Colour grade</h2>
-      <div id="gradeRow" class="chip-row" role="group" aria-label="Colour grade"></div>
+    <section class="card">
+      <h2><span>4</span> · COLOUR GRADE</h2>
+      <div class="row" id="gradeRow">
+        <button type="button" data-grade="sunset" class="pill grade-sunset active">Sunset</button>
+        <button type="button" data-grade="neon" class="pill grade-neon">Neon Nights</button>
+        <button type="button" data-grade="gold" class="pill grade-gold">Vice Gold</button>
+      </div>
+      <button id="randomBtn" type="button" class="ghost">Random cover (R)</button>
     </section>
+  </aside>
 
-    <button id="randomBtn" type="button" class="ghost-btn">Surprise me — random cover</button>
-  </section>
-
-  <section class="stage" aria-label="Live preview">
+  <section class="preview" aria-label="Live preview">
     <div class="canvas-wrap">
       <canvas id="preview"></canvas>
     </div>
-    <p class="stage-note">Live preview — click a panel to select it. Export downloads a full-resolution PNG. Press <kbd>E</kbd> to export, <kbd>R</kbd> for a random cover.</p>
+    <p class="hint">Live preview — click a panel to select it. Export downloads a full-resolution PNG. Press <kbd>E</kbd> to export, <kbd>R</kbd> for a random cover.</p>
   </section>
 </main>
 
-<footer class="foot">
-  <p>Solmar Bay is a fictional city. All art is drawn in code by this app — no photos are uploaded anywhere, and no licensed artwork is used.</p>
-</footer>
-
-<script type="module" src="src/main.js"></script>
+<script type="module" src="./src/main.js"></script>
 </body>
 </html>

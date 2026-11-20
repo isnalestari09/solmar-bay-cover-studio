@@ -1,76 +1,42 @@
-// shots.js — the four screenshots this entry hands in, as data.
-//
-// Each shot names the file, the pixel size, and the exact cover preset that
-// produced it, so the screenshot run and the dossier agree. `shotURL` turns a
-// shot into the app URL that renders it (the app reads the same query params
-// a person could share as a preset link).
+// URL presets for Solmar Bay Cover Studio, used by deep links and by
+// the screenshot runs. Examples:
+//   ?size=portrait&grade=gold&scene1=lighthouse&scene2=neon&scene3=boat
+//   ?photo2=sample        — load the generated sample photo into panel 2
+//   ?shot=cover           — hide the editor chrome, show only the cover
+//   ?title=VICE%20GOLD&subtitle=ONE%20LAST%20CHASE
+import { SIZES, GRADES } from './cover.js';
+import { SCENE_LIST } from './scenes.js';
 
-export const SHOTS = [
-  {
-    file: '1-cover.jpg',
-    label: 'Landscape cover',
-    width: 1280, height: 720,
-    view: 'cover', size: 'landscape',
-    scenes: ['sunset', 'chase', 'neon'], grade: 'sunset',
-    title: 'SOLMAR BAY', subtitle: 'A Dani Reyes Story',
-    tagline: 'Every sunset has a price.',
-  },
-  {
-    file: '2-editor.jpg',
-    label: 'Editor with a photo loaded',
-    width: 1280, height: 720,
-    view: 'editor', size: 'landscape',
-    scenes: ['sunset', 'lighthouse', 'neon'], grade: 'neon',
-    title: 'SOLMAR BAY', subtitle: 'A Dani Reyes Story',
-    tagline: 'Every sunset has a price.',
-    photo: 'sample', photoPanel: 1,
-  },
-  {
-    file: '3-cover.jpg',
-    label: 'Portrait cover',
-    width: 1024, height: 1280,
-    view: 'cover', size: 'portrait',
-    scenes: ['lighthouse', 'neon', 'chase'], grade: 'vice',
-    title: 'SOLMAR BAY', subtitle: 'One Last Chase',
-    tagline: 'The bay never forgets.',
-  },
-  {
-    file: '4-cover.jpg',
-    label: 'Square cover',
-    width: 1080, height: 1080,
-    view: 'cover', size: 'square',
-    scenes: ['chase', 'sunset', 'lighthouse'], grade: 'neon',
-    title: 'SOLMAR BAY', subtitle: 'Vice Gold',
-    tagline: 'Run the night.',
-  },
-];
-
-export function shotURL(shot, base = '') {
-  const q = new URLSearchParams();
-  q.set('view', shot.view);
-  q.set('size', shot.size);
-  q.set('grade', shot.grade);
-  q.set('title', shot.title);
-  q.set('subtitle', shot.subtitle);
-  q.set('tagline', shot.tagline);
-  q.set('scenes', shot.scenes.join(','));
-  if (shot.photo) q.set('photo', shot.photo);
-  if (shot.photoPanel !== undefined) q.set('photoPanel', String(shot.photoPanel));
-  return `${base}/?${q.toString()}`;
-}
-
-export function applyShotToState(shot, state) {
-  state.size = shot.size;
-  state.grade = shot.grade;
-  state.title = shot.title;
-  state.subtitle = shot.subtitle;
-  state.tagline = shot.tagline;
-  shot.scenes.forEach((scene, i) => {
-    if (state.panels[i]) {
-      state.panels[i].kind = 'scene';
+export function applyShotParams(state, hooks) {
+  const q = new URLSearchParams(location.search);
+  const loads = [];
+  const size = q.get('size');
+  if (size && SIZES[size]) state.size = size;
+  const grade = q.get('grade');
+  if (grade && GRADES[grade]) state.grade = grade;
+  const title = q.get('title');
+  if (title) state.title = title.slice(0, 24).toUpperCase();
+  const subtitle = q.get('subtitle');
+  if (subtitle) state.subtitle = subtitle.slice(0, 40).toUpperCase();
+  const tagline = q.get('tagline');
+  if (tagline) state.tagline = tagline.slice(0, 60);
+  const keys = new Set(SCENE_LIST.map((s) => s.key));
+  for (let i = 0; i < 3; i++) {
+    const scene = q.get(`scene${i + 1}`);
+    if (scene && keys.has(scene)) {
       state.panels[i].scene = scene;
-      state.panels[i].photo = null;
+      state.panels[i].mode = 'scene';
     }
-  });
-  return state;
+    if (q.get(`photo${i + 1}`) === 'sample') {
+      loads.push(hooks.loadSamplePhoto(i));
+    }
+    const zoom = Number(q.get(`zoom${i + 1}`));
+    if (Number.isFinite(zoom) && zoom >= 0.5 && zoom <= 3) {
+      state.panels[i].zoom = zoom;
+    }
+  }
+  if (q.get('shot') === 'cover') {
+    document.body.classList.add('shot-cover');
+  }
+  return Promise.all(loads);
 }
